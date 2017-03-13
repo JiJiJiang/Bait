@@ -64,13 +64,14 @@ public class Agent extends AbstractPlayer {
         ArrayList<Observation>[] portalPositions = stateObs.getPortalsPositions();
         grid = stateObs.getObservationGrid();
 
-        ///*
+        /*
         printDebug(npcPositions,"npc");
         printDebug(fixedPositions,"fix");
         printDebug(movingPositions,"mov");
         printDebug(resourcesPositions,"res");
         printDebug(portalPositions,"por");
-        System.out.println();               //*/
+        System.out.println();
+        //*/
 
         Types.ACTIONS action = null;
         StateObservation stCopy = stateObs.copy();

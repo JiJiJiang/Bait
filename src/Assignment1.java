@@ -18,9 +18,9 @@ public class Assignment1 {
     public static void main(String[] args)
     {
         //Available controllers:
-    	String depthfirstController = "controllers.depthfirst.Agent";
+    	//String depthfirstController = "controllers.depthfirst.Agent";
     	//String depthfirstController = "controllers.sampleRandom.Agent";
-    	//String limitdepthfirstController = "controllers.limitdepthfirst.Agent";
+    	String limitdepthfirstController = "controllers.limitdepthfirst.Agent";
         //String AstarController = "controllers.Astar.Agent";
         //String sampleMCTSController = "controllers.sampleMCTS.Agent";
 
@@ -29,14 +29,16 @@ public class Assignment1 {
         
         
         /****** Task 1 ******/
-        CompetitionParameters.ACTION_TIME = 10000; // set to the time that allow you to do the depth first search
-        ArcadeMachine.runOneGame("examples/gridphysics/bait.txt", "examples/gridphysics/bait_lvl0.txt", true, depthfirstController, null, seed, false);
-        
+        /*
+        CompetitionParameters.ACTION_TIME = 10000;//40 // set to the time that allow you to do the depth first search
+        ArcadeMachine.runOneGame("examples/gridphysics/bait.txt", "examples/gridphysics/bait_lvl1.txt", true, depthfirstController, null, seed, false);
+        //*/
         
         /****** Task 2 ******/
-        //CompetitionParameters.ACTION_TIME = 100; // no time for finding the whole path
-        //ArcadeMachine.runOneGame("examples/gridphysics/bait.txt", "examples/gridphysics/bait_lvl0.txt", true, limitdepthfirstController, null, seed, false);
-        
+        ///*
+        CompetitionParameters.ACTION_TIME = 100; // no time for finding the whole path
+        ArcadeMachine.runOneGame("examples/gridphysics/bait.txt", "examples/gridphysics/bait_lvl0.txt", true, limitdepthfirstController, null, seed, false);
+        //*/
         
         /****** Task 3 ******/
         /*

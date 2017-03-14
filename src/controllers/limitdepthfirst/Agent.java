@@ -13,18 +13,25 @@ import java.util.*;
  * Created by 77 on 2017/3/13.
  */
 public class Agent extends AbstractPlayer{
-    StateObservation lastStateObs;//last stateObservation
-
     Types.ACTIONS curAction;//current action
     Types.ACTIONS bestAction;//best action to do
+    private boolean bestActionFound=false;//whether the best action found or not!
     double bestHeuristicValue;//best heuristic value of this best action
     ArrayList<StateObservation> allStateObsVisited;//all stateObservations visited.
+    ArrayList<StateObservation> path;//actions done
 
-    //judge whether a stateObs has been visited or not!
-    boolean isVisited(StateObservation so)
-    {
-        for(StateObservation stateObs:allStateObsVisited){
-            if(so.equalPosition(stateObs))
+    /**
+     * judge whether a stateObs has been visited or not!
+     * @param so The stateObs to judge.
+     * @return true or false.
+     */
+    boolean isVisited(StateObservation so) {
+        for(int i=allStateObsVisited.size()-1;i>=0;i--){
+            if(so.equalPosition(allStateObsVisited.get(i)))
+                return true;
+        }
+        for(int i=path.size()-1;i>=0;i--){
+            if(so.equalPosition(path.get(i)))
                 return true;
         }
         return false;
@@ -35,7 +42,8 @@ public class Agent extends AbstractPlayer{
      * @param elapsedTimer Timer for the controller creation.
      */
     public Agent(StateObservation so, ElapsedCpuTimer elapsedTimer){
-        lastStateObs=null;
+        //lastStateObs=null;
+        path =new ArrayList<StateObservation>();
         allStateObsVisited=new ArrayList<StateObservation>();
     }
 
@@ -44,6 +52,7 @@ public class Agent extends AbstractPlayer{
      */
     void initialDataFields(){
         //initialize data fields.
+        bestActionFound=false;
         bestAction= Types.ACTIONS.ACTION_NIL;
         bestHeuristicValue=Double.MAX_VALUE;
         allStateObsVisited.clear();
@@ -56,26 +65,30 @@ public class Agent extends AbstractPlayer{
      * @param elapsedTimer Timer when the action returned is due.
      * @return An action for the current state
      */
-    private final int LIMIT=5;
+    private final int LIMIT=5;//depth limit: [2,9]
     public Types.ACTIONS act(StateObservation stateObs, ElapsedCpuTimer elapsedTimer) {
         //System.out.println(stateObs.getAvatarType());
         initialDataFields();
         limitDepthFirstSearch(stateObs,LIMIT);
 
-        lastStateObs=stateObs.copy();
+        path.add(stateObs.copy());
         System.out.println(bestAction);
         return bestAction;
     }
 
-    //private boolean bestActionFound=false;
+    /**
+     * do a limitDepthFirstSearch to find the best action.
+     * @param stateObs Current stateObservation.
+     * @param limit depth limit
+     */
     private void limitDepthFirstSearch(StateObservation stateObs,int limit){
-        //if(bestActionFound) return;
+        if(bestActionFound) return;
         allStateObsVisited.add(stateObs);
         if(stateObs.isGameOver()){
             if(stateObs.getGameWinner()==Types.WINNER.PLAYER_WINS){
                 bestAction=curAction;
                 bestHeuristicValue=0;
-                //bestActionFound=true;
+                bestActionFound=true;
             }
         }else if(limit==0){
             double curHeuristicValue=heuristic(stateObs);
@@ -88,7 +101,7 @@ public class Agent extends AbstractPlayer{
                 //if(limit==LIMIT) curAction=action;
                 StateObservation stCopy = stateObs.copy();
                 stCopy.advance(action);
-                if (isStateObsMeaningful(stCopy)&&!isVisited(stCopy)) {
+                if (!isVisited(stCopy)) {
                     if(limit==LIMIT) curAction=action;
                     limitDepthFirstSearch(stCopy, limit - 1);
                 }
@@ -97,21 +110,11 @@ public class Agent extends AbstractPlayer{
     }
 
     /**
-     * judge whether a stateObservation is meaningful or not
+     * heuristic function: to get the heuristic value of this stateObservation.
+     * @param stateObs Current stateObservation.
+     * @return The heuristic value.
      */
-    boolean isStateObsMeaningful(StateObservation stateObs)
-    {
-        if(stateObs.equalPosition(lastStateObs))
-            return false;
-        else
-            return true;
-    }
-
-    /**
-     * heuristic function
-     */
-    private double heuristic(StateObservation stateObs)
-    {
+    private double heuristic(StateObservation stateObs) {
         Vector2d avatarPos=stateObs.getAvatarPosition();
 
         ArrayList<Observation>[] fixedPositions = stateObs.getImmovablePositions();

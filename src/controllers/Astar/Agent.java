@@ -85,7 +85,9 @@ public class Agent extends AbstractPlayer{
 
         for(Types.ACTIONS action:stateObs.getAvailableActions()) {
             double curHeuristicValue=heuristic(stateObs,action);
-            if(curHeuristicValue<bestHeuristicValue){
+            if(curHeuristicValue<bestHeuristicValue
+                    ||bestHeuristicValue!=Double.MAX_VALUE&&curHeuristicValue==bestHeuristicValue
+                    &&new Random().nextInt(2)==0){
                 bestAction=action;
                 bestHeuristicValue=curHeuristicValue;
             }
@@ -120,13 +122,14 @@ public class Agent extends AbstractPlayer{
         if(stateObs.isGameOver()){//当前状态游戏结束了
             if(stateObs.getGameWinner()==Types.WINNER.PLAYER_WINS)
                 return 0.0;
-            else if(!toFillHole){//玩家输了,掉到洞里了(未拿到钥匙)
+            else if(!toFillHole&&bestHeuristicValue>0.1){//玩家输了,掉到洞里了(未拿到钥匙)
                 toFillHole=true;
                 allStateObsVisited.clear();//清空，允许往回走
+                allStateObsVisited.add(lastStateObs.copy());
                 //设置洞和箱子的坐标
                 calculateFillHolePos(lastStateObs,action);
                 boxHoleDist=calculateFillBoxPos(lastStateObs);
-                //System.out.println(boxPos);
+                System.out.println(boxPos);
             }
             return Double.MAX_VALUE;
         }else if(isVisited(stateObs)) {//该状态已经访问过
@@ -143,26 +146,53 @@ public class Agent extends AbstractPlayer{
             Vector2d avatarPos = stateObs.getAvatarPosition();
 
             if(toFillHole){//现在是在填洞
-                if(stateObs.getGameScore()>lastStateObs.getGameScore()) {//把洞填上
+                if(stateObs.getGameScore()>lastStateObs.getGameScore()//把洞填上
+                        ||stateObs.getAvatarType()==4//吃到钥匙
+                        ) {
                     toFillHole=false;
+                    boxHoleDist=Double.MAX_VALUE;
+                    //System.out.println("!!!!!!");
                     return 0.0;
                 }
                 else if (isBoxsChanged(lastMovingPositions[1], movingPositions[1])) {
-                    Vector2d preBoxPos=boxPos;
+                    ///*
+                    if(isBestBoxMoved(movingPositions[1])){
+                        Vector2d newBestBoxPos=calculateNewBestBoxPos(action);
+                        if(newBestBoxPos.dist(holePos)<boxHoleDist){
+                            boxPos=newBestBoxPos;
+                            boxHoleDist=newBestBoxPos.dist(holePos);
+                            return 0.0;
+                        }else{
+                            return Double.MAX_VALUE;
+                        }
+                    }else{
+                        return Double.MAX_VALUE;
+                    }
+                    //*/
+                    /*
+                    Vector2d preBoxPos=boxPos.copy();
                     double curBoxHoleDist = calculateFillBoxPos(stateObs);
+                    System.out.println(boxPos);
                     if (curBoxHoleDist >= boxHoleDist) {
-                        boxPos=preBoxPos;
+                        boxPos=preBoxPos.copy();
                         return Double.MAX_VALUE;
                     }else{
                         boxHoleDist=curBoxHoleDist;
                         return 0.0;
                     }
+                    //*/
                 }else{
                     //System.out.println(boxPos);
                     return boxPos.dist(avatarPos);
                 }
             }else {//往蘑菇，钥匙或目标逼近
-                if (stateObs.getAvatarType() == 4) {//已拿到钥匙
+                if(stateObs.getGameScore()>lastStateObs.getGameScore()//得分
+                        || (lastStateObs.getAvatarType()==1&&stateObs.getAvatarType()==4)//拿到钥匙
+                        ) {
+                    //System.out.println("!!!");
+                    return 0.0;
+                }
+                else if (stateObs.getAvatarType() == 4) {//已拿到钥匙
                     Vector2d goalPos = fixedPositions[fixedSpriteNum - 1].get(0).position;
                     return goalPos.dist(avatarPos);
                 } else {//未拿到钥匙
@@ -174,11 +204,22 @@ public class Agent extends AbstractPlayer{
                             return mushroomPos.dist(avatarPos);
                         }
                     } else {//==3,没有蘑菇（或已经拿到）,逼近钥匙
-                        if (isBoxsChanged(lastMovingPositions[1], movingPositions[1])) {//如果箱子位置改变了,但没有减少
-                            return Double.MAX_VALUE;//不能无故改变箱子位置
-                        } else {//返回与钥匙的距离
+                        if(fixedPositions.length==3) {//有洞
+                            if (movingPositions.length > 1//有箱子
+                                    && isBoxsChanged(lastMovingPositions[1], movingPositions[1])) {//如果箱子位置改变了,但没有减少
+                                return Double.MAX_VALUE;//不能无故改变箱子位置
+                            } else {//返回与钥匙的距离
+                                Vector2d keyPos = movingPositions[0].get(0).position;
+                                return keyPos.dist(avatarPos);
+                            }
+                        }
+                        else{//没洞
                             Vector2d keyPos = movingPositions[0].get(0).position;
-                            return keyPos.dist(avatarPos);
+                            if (movingPositions.length>1&&isKeyCovered(keyPos,movingPositions[1])) {//有箱子
+                                return Double.MAX_VALUE;
+                            }else{
+                                return keyPos.dist(avatarPos);
+                            }
                         }
                     }
                 }
@@ -207,9 +248,9 @@ public class Agent extends AbstractPlayer{
         }else if(action.equals(Types.ACTIONS.ACTION_RIGHT)){
             holePos.x+=50.0;
         }else if(action.equals(Types.ACTIONS.ACTION_DOWN)){
-            holePos.y-=50.0;
+            holePos.y+=50.0;
         }else if(action.equals(Types.ACTIONS.ACTION_UP)) {
-            holePos.y += 50.0;
+            holePos.y -= 50.0;
         }
     }
     /**
@@ -223,7 +264,7 @@ public class Agent extends AbstractPlayer{
                 double curDist = holePos.dist(ob.position);
                 if (curDist < minDist) {
                     minDist = curDist;
-                    boxPos = ob.position;
+                    boxPos = ob.position.copy();
                 }
             }
         }
@@ -240,15 +281,57 @@ public class Agent extends AbstractPlayer{
         int []y={0,0,-1,1};
         for(int i=0;i<4;i++) {
             //该位置空白或是玩家
-            if(grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].size()==0
-                    ||(grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].size()==1
-                        &&grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].get(0).itype==1)   )
+            int size=grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].size();
+            if(size==0)
                 count++;
+            else if(size==1) {
+                int itype=grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].get(0).itype;
+                if((itype==1 || itype==4 ||
+                        (itype==2&&grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].get(0).position.dist(holePos)<0.1)))
+                    count++;
+            }
         }
         //System.out.println(count);
         if(count>=2)
             return true;
         else
             return false;
+    }
+    /**
+     * 判断bestBox是否已经移动
+     */
+    private boolean isBestBoxMoved(ArrayList<Observation> boxs){
+        for(Observation ob:boxs){
+            if(ob.position.sqDist(boxPos)<0.1)
+                return false;
+        }
+        return true;
+    }
+    /**
+     * 计算bestBox的新位置
+     */
+    private Vector2d calculateNewBestBoxPos(Types.ACTIONS action){
+        Vector2d newBestBoxPos=boxPos.copy();
+        if(action.equals(Types.ACTIONS.ACTION_LEFT)){
+            newBestBoxPos.x-=50.0;
+        }else if(action.equals(Types.ACTIONS.ACTION_RIGHT)){
+            newBestBoxPos.x+=50.0;
+        }else if(action.equals(Types.ACTIONS.ACTION_DOWN)){
+            newBestBoxPos.y+=50.0;
+        }else if(action.equals(Types.ACTIONS.ACTION_UP)) {
+            newBestBoxPos.y -= 50.0;
+        }
+        return newBestBoxPos;
+    }
+    /**
+     * 判断是否有箱子与钥匙重合
+     */
+    private boolean isKeyCovered(Vector2d keyPos,ArrayList<Observation> boxs){
+        for(Observation ob:boxs){
+            if(ob.position.sqDist(keyPos)<0.1){
+                return true;
+            }
+        }
+        return false;
     }
 }

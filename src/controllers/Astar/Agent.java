@@ -92,9 +92,12 @@ public class Agent extends AbstractPlayer{
                 bestHeuristicValue=curHeuristicValue;
             }
         }
-
-        if(bestAction.equals(Types.ACTIONS.ACTION_NIL))
+        ///*
+        if(bestAction.equals(Types.ACTIONS.ACTION_NIL)) {
             allStateObsVisited.clear();
+            allStateObsVisited.add(stateObs.copy());
+        }
+        //*/
 
         System.out.println(bestAction);
         return bestAction;
@@ -109,6 +112,7 @@ public class Agent extends AbstractPlayer{
     private boolean toFillHole=false;
     private Vector2d boxPos=null;//箱子坐标
     private Vector2d holePos=null;//洞坐标
+    private Vector2d targetPos=null;//目标坐标
     private double boxHoleDist=Double.MAX_VALUE;//箱子与洞的距离
     private double heuristic(StateObservation lastStateObs,Types.ACTIONS action) {
         //基于目标的阶段策略
@@ -122,18 +126,23 @@ public class Agent extends AbstractPlayer{
         if(stateObs.isGameOver()){//当前状态游戏结束了
             if(stateObs.getGameWinner()==Types.WINNER.PLAYER_WINS)
                 return 0.0;
-            else if(!toFillHole&&bestHeuristicValue>0.1){//玩家输了,掉到洞里了(未拿到钥匙)
+            else if(!toFillHole
+                    &&targetPos.dist(calculateFillHolePos(lastStateObs, action))<targetPos.dist(lastStateObs.getAvatarPosition())){
+                //玩家输了,掉到洞里了(未拿到钥匙),且洞比玩家更靠近目标位置
+
                 toFillHole=true;
                 allStateObsVisited.clear();//清空，允许往回走
                 allStateObsVisited.add(lastStateObs.copy());
+
                 //设置洞和箱子的坐标
-                calculateFillHolePos(lastStateObs,action);
+                holePos=calculateFillHolePos(lastStateObs,action);
+                System.out.println(holePos);
                 boxHoleDist=calculateFillBoxPos(lastStateObs);
-                System.out.println(boxPos);
+                //System.out.println(boxPos);
             }
             return Double.MAX_VALUE;
         }else if(isVisited(stateObs)) {//该状态已经访问过
-            return Double.MAX_VALUE;
+            return Double.MAX_VALUE/2;
         }else{//游戏未结束
             //上一个状态的地图上的东西
             ArrayList<Observation>[] lastMovingPositions = lastStateObs.getMovablePositions();
@@ -146,11 +155,12 @@ public class Agent extends AbstractPlayer{
             Vector2d avatarPos = stateObs.getAvatarPosition();
 
             if(toFillHole){//现在是在填洞
-                if(stateObs.getGameScore()>lastStateObs.getGameScore()//把洞填上
+                if(stateObs.getGameScore()>lastStateObs.getGameScore()
+                    //&&isHoleFilled(fixedPositions[1])//把洞填上
                         ||stateObs.getAvatarType()==4//吃到钥匙
                         ) {
-                    toFillHole=false;
-                    boxHoleDist=Double.MAX_VALUE;
+                    toFillHole = false;
+                    boxHoleDist = Double.MAX_VALUE;
                     //System.out.println("!!!!!!");
                     return 0.0;
                 }
@@ -194,6 +204,7 @@ public class Agent extends AbstractPlayer{
                 }
                 else if (stateObs.getAvatarType() == 4) {//已拿到钥匙
                     Vector2d goalPos = fixedPositions[fixedSpriteNum - 1].get(0).position;
+                    targetPos=goalPos.copy();
                     return goalPos.dist(avatarPos);
                 } else {//未拿到钥匙
                     if (fixedSpriteNum == 4) {//有蘑菇
@@ -201,6 +212,7 @@ public class Agent extends AbstractPlayer{
                             return Double.MAX_VALUE;//不能无故改变箱子位置
                         } else {//返回与蘑菇的距离
                             Vector2d mushroomPos = fixedPositions[2].get(0).position;
+                            targetPos=mushroomPos.copy();
                             return mushroomPos.dist(avatarPos);
                         }
                     } else {//==3,没有蘑菇（或已经拿到）,逼近钥匙
@@ -210,11 +222,13 @@ public class Agent extends AbstractPlayer{
                                 return Double.MAX_VALUE;//不能无故改变箱子位置
                             } else {//返回与钥匙的距离
                                 Vector2d keyPos = movingPositions[0].get(0).position;
+                                targetPos=keyPos.copy();
                                 return keyPos.dist(avatarPos);
                             }
                         }
                         else{//没洞
                             Vector2d keyPos = movingPositions[0].get(0).position;
+                            targetPos=keyPos.copy();
                             if (movingPositions.length>1&&isKeyCovered(keyPos,movingPositions[1])) {//有箱子
                                 return Double.MAX_VALUE;
                             }else{
@@ -241,8 +255,8 @@ public class Agent extends AbstractPlayer{
     /**
      * 计算待填的洞的位置
      */
-    private void calculateFillHolePos(StateObservation lastStateObs,Types.ACTIONS action){
-        holePos=lastStateObs.getAvatarPosition();
+    private Vector2d calculateFillHolePos(StateObservation lastStateObs,Types.ACTIONS action){
+        Vector2d holePos=lastStateObs.getAvatarPosition();
         if(action.equals(Types.ACTIONS.ACTION_LEFT)){
             holePos.x-=50.0;
         }else if(action.equals(Types.ACTIONS.ACTION_RIGHT)){
@@ -252,6 +266,7 @@ public class Agent extends AbstractPlayer{
         }else if(action.equals(Types.ACTIONS.ACTION_UP)) {
             holePos.y -= 50.0;
         }
+        return holePos;
     }
     /**
      * 计算箱子的位置
@@ -333,5 +348,15 @@ public class Agent extends AbstractPlayer{
             }
         }
         return false;
+    }
+    /**
+     * 判断目标洞是否被填上
+     */
+    private boolean isHoleFilled(ArrayList<Observation> holes){
+        for(Observation hole:holes){
+            if(hole.position.dist(holePos)<0.1)
+                return false;
+        }
+        return true;
     }
 }

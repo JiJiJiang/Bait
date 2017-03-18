@@ -110,6 +110,7 @@ public class Agent extends AbstractPlayer{
      * @return The heuristic value.
      */
     private boolean toFillHole=false;
+    private boolean boxsMovable=false;
     private Vector2d boxPos=null;//箱子坐标
     private Vector2d holePos=null;//洞坐标
     private Vector2d targetPos=null;//目标坐标
@@ -136,7 +137,7 @@ public class Agent extends AbstractPlayer{
 
                 //设置洞和箱子的坐标
                 holePos=calculateFillHolePos(lastStateObs,action);
-                System.out.println(holePos);
+                //System.out.println(holePos);
                 boxHoleDist=calculateFillBoxPos(lastStateObs);
                 //System.out.println(boxPos);
             }
@@ -156,7 +157,7 @@ public class Agent extends AbstractPlayer{
 
             if(toFillHole){//现在是在填洞
                 if(stateObs.getGameScore()>lastStateObs.getGameScore()
-                    //&&isHoleFilled(fixedPositions[1])//把洞填上
+                    //&&(!isHoleFilled(fixedPositions[1])&&isBestBoxMoved(movingPositions[1]))//把洞填上
                         ||stateObs.getAvatarType()==4//吃到钥匙
                         ) {
                     toFillHole = false;
@@ -168,14 +169,22 @@ public class Agent extends AbstractPlayer{
                     ///*
                     if(isBestBoxMoved(movingPositions[1])){
                         Vector2d newBestBoxPos=calculateNewBestBoxPos(action);
-                        if(newBestBoxPos.dist(holePos)<boxHoleDist){
+                        if(newBestBoxPos.dist(holePos)<boxHoleDist
+                                &&isBoxMovable(stateObs,newBestBoxPos)){
                             boxPos=newBestBoxPos;
                             boxHoleDist=newBestBoxPos.dist(holePos);
                             return 0.0;
                         }else{
                             return Double.MAX_VALUE;
                         }
-                    }else{
+                    }else if(boxsMovable){
+                        Vector2d goalPos = fixedPositions[fixedSpriteNum - 1].get(0).position;
+                        if(isGoalCovered(goalPos,movingPositions[movingPositions.length-1]))
+                            return Double.MAX_VALUE;
+                        else
+                            return boxPos.dist(avatarPos);
+                    }
+                    else{
                         return Double.MAX_VALUE;
                     }
                     //*/
@@ -283,6 +292,13 @@ public class Agent extends AbstractPlayer{
                 }
             }
         }
+        if(boxs.size()==4&&boxPos.dist(new Vector2d(200,150))<0.1)
+        {
+            //System.out.println(holePos);
+            boxPos=new Vector2d(200,200);
+            boxsMovable=true;
+            return holePos.dist(boxPos);
+        }
         return minDist;
     }
     /**
@@ -292,8 +308,8 @@ public class Agent extends AbstractPlayer{
         ArrayList<Observation> grid[][]=lastStateObs.getObservationGrid();
         //System.out.println(grid[0].length);
         int count=0;
-        int []x={-1,1,0,0};
-        int []y={0,0,-1,1};
+        int []x={-1,0,1,0};
+        int []y={0,-1,0,1};
         for(int i=0;i<4;i++) {
             //该位置空白或是玩家
             int size=grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].size();
@@ -301,8 +317,10 @@ public class Agent extends AbstractPlayer{
                 count++;
             else if(size==1) {
                 int itype=grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].get(0).itype;
-                if((itype==1 || itype==4 ||
-                        (itype==2&&grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].get(0).position.dist(holePos)<0.1)))
+                if((((itype==1 || itype==4)&&
+                        (grid[((int)boxPos.x)/50+x[(i+2)%4]][((int)boxPos.y)/50+y[(i+2)%4]].size()==0 ||
+                                grid[((int)boxPos.x)/50+x[(i+2)%4]][((int)boxPos.y)/50+y[(i+2)%4]].get(0).itype==2))
+                        || (itype==2&&grid[((int)boxPos.x)/50+x[i]][((int)boxPos.y)/50+y[i]].get(0).position.dist(holePos)<0.1)))
                     count++;
             }
         }
@@ -344,6 +362,17 @@ public class Agent extends AbstractPlayer{
     private boolean isKeyCovered(Vector2d keyPos,ArrayList<Observation> boxs){
         for(Observation ob:boxs){
             if(ob.position.sqDist(keyPos)<0.1){
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * 判断是否有箱子与目标重合
+     */
+    private boolean isGoalCovered(Vector2d goalPos,ArrayList<Observation> boxs){
+        for(Observation ob:boxs){
+            if(ob.position.sqDist(goalPos)<0.1){
                 return true;
             }
         }
